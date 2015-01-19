@@ -19,8 +19,7 @@ import (
 	"strings"
 )
 
-// FilesOfArgs returns all available Go files given a list of packages, directories and files which can embed patterns.
-func FilesOfArgs(args []string) []string {
+func packagesWithFilesOfArgs(args []string) map[string]map[string]struct{} {
 	var filenames []string
 
 	if len(args) == 0 {
@@ -73,6 +72,13 @@ func FilesOfArgs(args []string) []string {
 		pkg[filename] = struct{}{}
 	}
 
+	return pkgs
+}
+
+// FilesOfArgs returns all available Go files given a list of packages, directories and files which can embed patterns.
+func FilesOfArgs(args []string) []string {
+	pkgs := packagesWithFilesOfArgs(args)
+
 	pkgsNames := make([]string, 0, len(pkgs))
 	for name := range pkgs {
 		pkgsNames = append(pkgsNames, name)
@@ -92,6 +98,52 @@ func FilesOfArgs(args []string) []string {
 	}
 
 	return files
+}
+
+// Package holds file information of a package.
+type Package struct {
+	Name  string
+	Files []string
+}
+
+// Packages defines a list of packages.
+type Packages []Package
+
+// Len is the number of elements in the collection.
+func (p Packages) Len() int { return len(p) }
+
+// Swap swaps the elements with indexes i and j.
+func (p Packages) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+// PackagesByName sorts a list of packages by their name.
+type PackagesByName struct{ Packages }
+
+// Less reports whether the element with index i should sort before the element with index j.
+func (p PackagesByName) Less(i, j int) bool { return p.Packages[i].Name < p.Packages[j].Name }
+
+// PackagesWithFilesOfArgs returns all available Go files sorted by their packages given a list of packages, directories and files which can embed patterns.
+func PackagesWithFilesOfArgs(args []string) []Package {
+	pkgs := packagesWithFilesOfArgs(args)
+
+	r := make([]Package, 0, len(pkgs))
+	for name := range pkgs {
+		r = append(r, Package{
+			Name: name,
+		})
+	}
+	sort.Sort(PackagesByName{r})
+
+	for i := range r {
+		var filenames []string
+		for name := range pkgs[r[i].Name] {
+			filenames = append(filenames, name)
+		}
+		sort.Strings(filenames)
+
+		r[i].Files = filenames
+	}
+
+	return r
 }
 
 func isDir(filename string) bool {
